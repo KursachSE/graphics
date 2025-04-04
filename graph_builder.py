@@ -18,20 +18,12 @@ def donut_chart(df):
 
 
 def price_kde(df):
-    target_key = "Очная, на русском, Полный курс, на базе 11 классов"
-
     fig = Figure(figsize=(8, 6))
     fig.patch.set_alpha(0.0)
     ax = fig.add_subplot(111)
     ax.set_facecolor('none')
 
-    def get_prices(x):
-        val = x.get(target_key, {}).get('Платное', {})
-        if isinstance(val, dict):
-            return val.get('Стоимость (в год)')
-        return None
-
-    prices = df['Варианты поступления'].dropna().apply(get_prices).dropna()
+    prices = df['Стоимость (в год)'].dropna()
     prices = prices[prices <= 1_000_000]
 
     ls = np.linspace(min(prices), max(prices), 200)
@@ -50,26 +42,17 @@ def price_kde(df):
 
 
 def points_kde(df):
-    target_key = "Очная, на русском, Полный курс, на базе 11 классов"
-
     fig = Figure(figsize=(8, 6))
     fig.patch.set_alpha(0.0)
     ax = fig.add_subplot(111)
     ax.set_facecolor('none')
 
-    def get_points(x):
-        ege = x.get('ЕГЭ', [])
-        vp = x.get('Варианты поступления', {})
-        if not isinstance(vp, dict):
-            return None
-        val = vp.get(target_key, {}).get('Бюджет')
-        if isinstance(val, dict):
-            score = val.get('Проходной балл')
-            if score and 0 < len(ege) < 6:
-                return score / len(ege)
-        return None
-
-    points = df.dropna(subset=['Варианты поступления']).apply(get_points, axis=1).dropna()
+    points = df.apply(
+        lambda row: row['Проходной балл на бюджет'] / row['Кол-во экзаменов']
+        if row['Проходной балл на бюджет'] is not None and row['Кол-во экзаменов'] > 0
+        else None,
+        axis=1
+    ).dropna()
 
     ls = np.linspace(min(points), max(points), 200)
     kde = gaussian_kde(points)
