@@ -3,11 +3,35 @@ import numpy as np
 from scipy.stats import gaussian_kde
 
 
-def donut_chart(df):
-    fig = Figure()
+GREEN = '#53b93f'
+
+
+def get_transparent_fig(a, b):
+    fig = Figure(figsize=(a, b))
+    fig.patch.set_alpha(0)
     ax = fig.add_subplot(111)
     ax.set_facecolor('none')
+    return fig, ax
+
+
+def set_scatter_signs(ax, title, x_label, y_label, color):
+    ax.set_title(title, fontsize=14, color=color)
+    ax.set_xlabel(x_label, fontsize=12, color=color)
+    ax.set_ylabel(y_label, fontsize=12, color=color)
+    ax.ticklabel_format(style='plain', axis='x')
+    ax.tick_params(axis='both', colors=color)
+    ax.grid(True, linestyle='--', alpha=0.5, color=color)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_color(color)
+    ax.spines['left'].set_color(color)
+    return ax
+
+
+def donut_chart(df):
+    fig, ax = get_transparent_fig(6, 6)
     ax.text(0, 0, 'Статистика ОП', ha='center', va='center')
+
     forms = df['Форма обучения'].explode()
     counts = forms.value_counts()
     ax.pie(counts.values, radius=1, wedgeprops={'width': 0.2})
@@ -17,56 +41,58 @@ def donut_chart(df):
     return fig
 
 
-def price_kde(df):
-    fig = Figure(figsize=(8, 6))
-    fig.patch.set_alpha(0.0)
-    ax = fig.add_subplot(111)
-    ax.set_facecolor('none')
+def build_kde_layout(var, title, x_label, color):
+    fig, ax = get_transparent_fig(8, 6)
+    ax = set_scatter_signs(ax, title, x_label, 'Плотность', color)
 
-    prices = df['Стоимость (в год)'].dropna()
-    prices = prices[prices <= 1_000_000]
-
-    ls = np.linspace(min(prices), max(prices), 200)
-    kde = gaussian_kde(prices)
-    ax.plot(ls, kde(ls), color='black', linewidth=2)
-
-    ax.set_title('Распределение годовой стоимости (очное обучение)\n', fontsize=14)
-    ax.set_xlabel('Стоимость, руб')
-    ax.set_ylabel('Плотность')
-    ax.ticklabel_format(style='plain', axis='x')
-    ax.grid(True, linestyle='--', alpha=0.5)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
+    ls = np.linspace(min(var), max(var), 200)
+    kde = gaussian_kde(var)
+    ax.plot(ls, kde(ls), color=color, linewidth=2)
 
     return fig
+    
+
+def price_kde(df):
+    title = 'Распределение годовой стоимости (очное обучение)\n'
+
+    prices = df['Стоимость (в год)'].dropna()
+    prices = prices[prices <= 1_000_000] / 1000
+
+    return build_kde_layout(prices, title, 'Стоимость, тыс. руб', 'black')
 
 
 def points_kde(df):
-    fig = Figure(figsize=(8, 6))
-    fig.patch.set_alpha(0.0)
-    ax = fig.add_subplot(111)
-    ax.set_facecolor('none')
+    title = 'Распределение проходных баллов ЕГЭ\n'
 
     points = df.apply(
         lambda row: row['Проходной балл на бюджет'] / row['Кол-во экзаменов']
-        if row['Проходной балл на бюджет'] is not None and row['Кол-во экзаменов'] > 0
-        else None,
+        if row['Проходной балл на бюджет'] is not None and row['Кол-во экзаменов'] > 0 else None,
         axis=1
     ).dropna()
 
-    ls = np.linspace(min(points), max(points), 200)
-    kde = gaussian_kde(points)
-    ax.plot(ls, kde(ls), color='white', linewidth=2)
+    return build_kde_layout(points, title, 'Баллы', 'white')
 
-    ax.set_title('Распределение проходных баллов ЕГЭ\n', fontsize=14, color='white')
-    ax.set_xlabel('Баллы', color='white')
-    ax.set_ylabel('Плотность', color='white')
-    ax.ticklabel_format(style='plain', axis='x')
-    ax.tick_params(axis='both', colors='white')
-    ax.grid(True, linestyle='--', alpha=0.5, color='white')
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['bottom'].set_color('white')
-    ax.spines['left'].set_color('white')
+
+def price_to_points_scatter(df):
+    title = 'Зависимость стоимости и проходного балла лучших вузов\n'
+    fig, ax = get_transparent_fig(9, 6)
+    ax = set_scatter_signs(ax, title, 'Стоимость, тыс. руб', 'Проходной балл на бюджет', 'black')
+
+    df = df[df['Место в топе'] < 13]
+    grouped = df.groupby('Университет').agg({'Стоимость (в год)': 'mean', 'Проходной балл на бюджет': 'mean'})
+    grouped['Стоимость (в год)'] = grouped['Стоимость (в год)'] / 1000
+    ax.scatter(grouped['Стоимость (в год)'], grouped['Проходной балл на бюджет'], color=GREEN, s=70)
+
+    for uni, row in grouped.iterrows():
+        ax.text(
+            row['Стоимость (в год)'] + 10,
+            row['Проходной балл на бюджет'],
+            uni,
+            fontsize=10,
+            fontweight='bold',
+            ha='left',
+            va='center',
+            color=GREEN
+        )
 
     return fig
