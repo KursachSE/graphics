@@ -30,7 +30,8 @@ class ClusterAnalyzer(BasePlotConfig):
         self.clusters = clusters
         self.method = method
 
-        cluster_groups = self.df.loc[mask].groupby('Кластер')['LINK'].agg(list).to_dict()
+        self.df.loc[mask.index, 'Кластер'] = clusters
+        cluster_groups = self.df.loc[mask.index].groupby('Кластер')['Ссылка'].agg(list).to_dict()
         return cluster_groups
 
     def kmeans_cluster_data(self, n_clusters=None):
